@@ -14,11 +14,20 @@ export default async function handler(req, res) {
 
   const { data: user, error } = await supabase.from('users').insert({ email: normalizedEmail, password_hash }).select('id, email').single();
   if (error) {
-    if (error.code === '23505') return res.status(409).json({ error: '이미 가입된 이메일입니다.' }); // C98
+    if (error.code === '23505') return res.status(409).json({ error: '이미 가입된 이메일입니다.' });
     return res.status(500).json({ error: error.message });
   }
 
   const { cookie } = await createSession(user.id);
   res.setHeader('Set-Cookie', cookie);
+
+  // 회원가입 성공 이벤트 기록
+  supabase.from('automation_events').insert({
+    event_type: 'signup_success',
+    user_id: user.id,
+    email: user.email,
+    created_at: new Date().toISOString()
+  }).then(() => {}, () => {});
+
   return res.status(201).json({ user });
 }
