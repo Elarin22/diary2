@@ -15,7 +15,42 @@ export default async function handler(req, res) {
     });
   }
 
+  const { type } = req.query;
+
   try {
+    // ── events 조회 ──
+    if (type === 'events') {
+      const { data, error } = await supabase
+        .from('automation_events')
+        .select('*')
+        .is('processed_at', null)
+        .order('created_at', { ascending: true })
+        .limit(50);
+
+      if (error) {
+        return res.status(500).json({
+          error: error.message
+        });
+      }
+
+      const events = data || [];
+
+      if (events.length > 0) {
+        const ids = events.map(e => e.id);
+        await supabase
+          .from('automation_events')
+          .update({ processed_at: new Date().toISOString() })
+          .in('id', ids);
+      }
+
+      return res.status(200).json({
+        checked_at: new Date().toISOString(),
+        count: events.length,
+        events
+      });
+    }
+
+    // ── todos 조회 (기본값) ──
     const today = new Date().toLocaleDateString('sv-SE', {
       timeZone: 'Asia/Seoul'
     });
