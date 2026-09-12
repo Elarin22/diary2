@@ -11,7 +11,6 @@ export default async function handler(req, res) {
   const normalizedEmail = String(email).trim().toLowerCase();
   const { data: user } = await supabase.from('users').select('*').eq('email', normalizedEmail).single();
 
-  // 아이디가 없을 때와 비밀번호가 틀렸을 때 응답 문구를 동일하게 유지 (C99)
   if (!user) return res.status(401).json({ error: GENERIC_ERROR });
 
   const ok = await verifyPassword(password, user.password_hash);
@@ -19,5 +18,14 @@ export default async function handler(req, res) {
 
   const { cookie } = await createSession(user.id);
   res.setHeader('Set-Cookie', cookie);
+
+  // 로그인 성공 이벤트 기록 (실패해도 로그인 자체는 정상 처리)
+  supabase.from('automation_events').insert({
+    event_type: 'login_success',
+    user_id: user.id,
+    email: user.email,
+    created_at: new Date().toISOString()
+  }).then(() => {}, () => {});
+
   return res.status(200).json({ user: { id: user.id, email: user.email } });
 }
