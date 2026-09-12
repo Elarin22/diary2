@@ -30,6 +30,20 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: insertErr.message });
   }
 
-  await supabase.from('todos').update({ status: 'done', updated_at: new Date().toISOString() }).eq('id', todo_id);
+  // 완료/중단 여부에 따라 status 분기
+  await supabase.from('todos').update({
+    status: blocked_reason ? 'blocked' : 'done',
+    updated_at: new Date().toISOString()
+  }).eq('id', todo_id);
+
+  // ToDo 완료/중단 이벤트 기록 (실패해도 응답엔 영향 없음)
+  supabase.from('automation_events').insert({
+    event_type: blocked_reason ? 'todo_blocked' : 'todo_done',
+    user_id: user.id,
+    todo_id: todo_id,
+    payload: blocked_reason ? { blocked_reason } : null,
+    created_at: new Date().toISOString()
+  }).then(() => {}, () => {});
+
   return res.status(201).json({ do_log: doLog, duplicate: false });
 }
